@@ -1,0 +1,67 @@
+@Library("shared") _
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_BUILDKIT = '1'
+    }
+
+    stages {
+        stage("hello"){
+            steps{
+                script{
+                    hello()
+                }
+            }
+        }
+        stage('Checkout') {
+            steps {
+                echo 'Checking out code...'
+                git branch: 'main',
+                    url: 'https://github.com/arkantandel/-PHP-Image-Upload-Project-with-Nginx-PHP-8.3-RDS-Amazon-S3-.git'
+                echo 'Code clone successfully...'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo 'Building the project...'
+                sh '''
+                    whoami
+                    docker buildx inspect mybuilder >/dev/null 2>&1 || docker buildx create --name mybuilder --use
+                    docker buildx use mybuilder
+                    docker buildx build --load -t notes-app:latest .
+                '''
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                echo 'Pushing image to DockerHub...'
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'DockerHub-Cread',
+                    usernameVariable: 'dockerHubUser',
+                    passwordVariable: 'dockerHubPass'
+                )]) {
+                    sh 'docker login -u $dockerHubUser -p $dockerHubPass'
+                    sh 'docker tag notes-app:latest $dockerHubUser/notes-app:latest'
+                    sh 'docker push $dockerHubUser/notes-app:latest'
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying application...'
+                sh 'docker run -d -p 9000:9000 notes-app:latest'
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline finished.'
+        }
+    }
+}
