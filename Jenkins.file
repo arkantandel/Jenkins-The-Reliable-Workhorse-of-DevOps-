@@ -37,7 +37,7 @@ pipeline {
 
         stage('Push to DockerHub') {
             steps {
-                echo 'Pushing image to DockerHub...'
+                echo 'Pushing image to DockerHub... Arkan tandel is the working to learn about the DevOps'
 
                 withCredentials([usernamePassword(
                     credentialsId: 'DockerHub-Cread',
