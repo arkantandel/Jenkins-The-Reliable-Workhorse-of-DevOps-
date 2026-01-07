@@ -1,67 +1,36 @@
-@Library("shared") _
 pipeline {
     agent any
 
     environment {
-        DOCKER_BUILDKIT = '1'
+        APP_DIR = "/opt/two-tier-app"
+        JAR_NAME = "app.jar"
     }
 
     stages {
-        stage("hello"){
-            steps{
-                script{
-                    hello()
-                }
-            }
-        }
-        stage('Checkout') {
+        stage('Clone Code') {
             steps {
-                echo 'Checking out code...'
-                git branch: 'main',
-                    url: 'https://github.com/arkantandel/-PHP-Image-Upload-Project-with-Nginx-PHP-8.3-RDS-Amazon-S3-.git'
-                echo 'Code clone successfully...'
+                git(
+                    url: 'https://github.com/arkantandel/two-tier-appilcation-RDS.git',
+                    credentialsId: 'github-token'
+                )
             }
         }
 
         stage('Build') {
             steps {
-                echo 'Building the project...'
-                sh '''
-                    whoami
-                    docker buildx inspect mybuilder >/dev/null 2>&1 || docker buildx create --name mybuilder --use
-                    docker buildx use mybuilder
-                    docker buildx build --load -t notes-app:latest .
-                '''
-            }
-        }
-
-        stage('Push to DockerHub') {
-            steps {
-                echo 'Pushing image to DockerHub... Arkan tandel is the working to learn about the DevOps'
-
-                withCredentials([usernamePassword(
-                    credentialsId: 'DockerHub-Cread',
-                    usernameVariable: 'dockerHubUser',
-                    passwordVariable: 'dockerHubPass'
-                )]) {
-                    sh 'docker login -u $dockerHubUser -p $dockerHubPass'
-                    sh 'docker tag notes-app:latest $dockerHubUser/notes-app:latest'
-                    sh 'docker push $dockerHubUser/notes-app:latest'
-                }
+                sh 'mvn clean package -DskipTests'
             }
         }
 
         stage('Deploy') {
             steps {
-                echo 'Deploying application...'
-                sh 'docker run -d -p 9000:9000 notes-app:latest'
+                sh '''
+                mkdir -p $APP_DIR
+                pkill -f $JAR_NAME || true
+                cp target/*.jar $APP_DIR/$JAR_NAME
+                nohup java -jar $APP_DIR/$JAR_NAME > $APP_DIR/app.log 2>&1 &
+                '''
             }
-        }
-    }
-
-    post {
-        always {
-            echo 'Pipeline finished.'
         }
     }
 }
